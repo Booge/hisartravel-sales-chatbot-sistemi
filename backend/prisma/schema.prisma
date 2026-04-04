@@ -1,0 +1,248 @@
+// Hisar Travel Sales ChatBot - Database Schema
+// Using Prisma ORM with PostgreSQL
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================
+// AUTH & USERS
+// ============================================
+
+enum UserRole {
+  ADMIN
+  MANAGER
+  AGENT
+}
+
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  passwordHash String   @map("password_hash")
+  name         String
+  role         UserRole @default(AGENT)
+  avatar       String?
+  isActive     Boolean  @default(true) @map("is_active")
+  lastLoginAt  DateTime? @map("last_login_at")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  assignedLeads Lead[]
+  sentMessages  Message[] @relation("AgentMessages")
+
+  @@map("users")
+}
+
+// ============================================
+// CONTACTS & CRM
+// ============================================
+
+enum ContactStatus {
+  LEAD
+  PROSPECT
+  CUSTOMER
+  LOST
+}
+
+model Contact {
+  id          String        @id @default(uuid())
+  name        String?
+  phone       String?       @unique
+  email       String?
+  whatsappId  String?       @unique @map("whatsapp_id")
+  webSessionId String?      @map("web_session_id")
+  status      ContactStatus @default(LEAD)
+  source      String?       // "whatsapp", "web", "manual"
+  metadata    Json?
+  tags        String[]      @default([])
+  notes       String?
+  createdAt   DateTime      @default(now()) @map("created_at")
+  updatedAt   DateTime      @updatedAt @map("updated_at")
+
+  conversations Conversation[]
+  leads         Lead[]
+  events        AnalyticsEvent[]
+
+  @@map("contacts")
+}
+
+// ============================================
+// CONVERSATIONS & MESSAGES
+// ============================================
+
+enum Channel {
+  WHATSAPP
+  WEB
+}
+
+enum ConversationStatus {
+  ACTIVE
+  WAITING
+  CLOSED
+  ARCHIVED
+}
+
+model Conversation {
+  id         String             @id @default(uuid())
+  contactId  String             @map("contact_id")
+  channel    Channel
+  status     ConversationStatus @default(ACTIVE)
+  sessionId  String?            @map("session_id")
+  aiContext  Json?              @map("ai_context") // Stores conversation summary for AI
+  metadata   Json?
+  closedAt   DateTime?          @map("closed_at")
+  createdAt  DateTime           @default(now()) @map("created_at")
+  updatedAt  DateTime           @updatedAt @map("updated_at")
+
+  contact  Contact   @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  messages Message[]
+
+  @@index([contactId])
+  @@index([channel, status])
+  @@map("conversations")
+}
+
+enum MessageSender {
+  CONTACT  // Müşteri
+  BOT      // AI Bot
+  AGENT    // İnsan agent
+  SYSTEM   // Sistem mesajı
+}
+
+enum MessageType {
+  TEXT
+  IMAGE
+  FILE
+  AUDIO
+  VIDEO
+  LOCATION
+  CONTACT_CARD
+  SYSTEM
+}
+
+model Message {
+  id             String        @id @default(uuid())
+  conversationId String        @map("conversation_id")
+  sender         MessageSender
+  type           MessageType   @default(TEXT)
+  content        String?
+  mediaUrl       String?       @map("media_url")
+  mediaType      String?       @map("media_type")
+  fileName       String?       @map("file_name")
+  aiModel        String?       @map("ai_model") // Which model was used
+  aiTokens       Int?          @map("ai_tokens") // Token usage
+  aiMetadata     Json?         @map("ai_metadata")
+  agentId        String?       @map("agent_id")
+  isRead         Boolean       @default(false) @map("is_read")
+  createdAt      DateTime      @default(now()) @map("created_at")
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  agent        User?        @relation("AgentMessages", fields: [agentId], references: [id])
+
+  @@index([conversationId])
+  @@index([createdAt])
+  @@map("messages")
+}
+
+// ============================================
+// LEADS & SALES PIPELINE
+// ============================================
+
+enum LeadStage {
+  NEW
+  CONTACTED
+  QUALIFIED
+  PROPOSAL
+  NEGOTIATION
+  WON
+  LOST
+}
+
+model Lead {
+  id          String    @id @default(uuid())
+  contactId   String    @map("contact_id")
+  stage       LeadStage @default(NEW)
+  score       Float     @default(0)
+  value       Float?    // Potential deal value
+  currency    String    @default("TRY")
+  title       String?
+  description String?
+  data        Json?
+  assignedTo  String?   @map("assigned_to")
+  wonAt       DateTime? @map("won_at")
+  lostAt      DateTime? @map("lost_at")
+  lostReason  String?   @map("lost_reason")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  contact  Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  assignee User?   @relation(fields: [assignedTo], references: [id])
+
+  @@index([contactId])
+  @@index([stage])
+  @@index([assignedTo])
+  @@map("leads")
+}
+
+// ============================================
+// BOT CONFIGURATION
+// ============================================
+
+model BotConfig {
+  id           String   @id @default(uuid())
+  name         String
+  systemPrompt String   @map("system_prompt") @db.Text
+  welcomeMessage String? @map("welcome_message")
+  model        String   @default("gpt-5.4-mini")
+  temperature  Float    @default(0.7)
+  maxTokens    Int      @default(1024) @map("max_tokens")
+  settings     Json?
+  isActive     Boolean  @default(true) @map("is_active")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  knowledgeBase KnowledgeBase[]
+
+  @@map("bot_configs")
+}
+
+model KnowledgeBase {
+  id          String   @id @default(uuid())
+  botConfigId String   @map("bot_config_id")
+  title       String
+  content     String   @db.Text
+  category    String?
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  botConfig BotConfig @relation(fields: [botConfigId], references: [id], onDelete: Cascade)
+
+  @@index([botConfigId])
+  @@map("knowledge_base")
+}
+
+// ============================================
+// ANALYTICS
+// ============================================
+
+model AnalyticsEvent {
+  id             String   @id @default(uuid())
+  eventType      String   @map("event_type")
+  contactId      String?  @map("contact_id")
+  conversationId String?  @map("conversation_id")
+  data           Json?
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  contact Contact? @relation(fields: [contactId], references: [id])
+
+  @@index([eventType])
+  @@index([contactId])
+  @@index([createdAt])
+  @@map("analytics_events")
+}
