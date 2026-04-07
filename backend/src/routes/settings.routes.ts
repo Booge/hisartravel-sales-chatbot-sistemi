@@ -112,7 +112,7 @@ router.delete(
   '/knowledge/:id',
   authMiddleware(['ADMIN']),
   asyncHandler(async (req: AuthRequest, res: Response) => {
-    await prisma.knowledgeBase.delete({ where: { id: req.params.id } });
+    await prisma.knowledgeBase.delete({ where: { id: req.params.id as string } });
     res.json({ message: 'Bilgi tabanı kaydı silindi' });
   })
 );

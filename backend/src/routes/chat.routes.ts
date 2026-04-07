@@ -96,7 +96,7 @@ router.get(
   '/conversations/:id/messages',
   authMiddleware(),
   asyncHandler(async (req: AuthRequest, res: Response) => {
-    const { id } = req.params;
+    const id = req.params.id as string;
     const { page, limit } = req.query;
     const result = await chatService.getMessages(
       id,
@@ -114,7 +114,7 @@ router.get(
 router.post(
   '/conversations/:id/messages',
   asyncHandler(async (req: AuthRequest, res: Response) => {
-    const { id } = req.params;
+    const id = req.params.id as string;
     const data = sendMessageSchema.parse(req.body);
 
     const result = await chatService.sendMessage({
@@ -137,7 +137,7 @@ router.post(
   '/conversations/:id/upload',
   upload.single('file'),
   asyncHandler(async (req: AuthRequest, res: Response) => {
-    const { id } = req.params;
+    const id = req.params.id as string;
 
     if (!req.file) {
       return res.status(400).json({ error: 'Dosya yüklenmedi' });

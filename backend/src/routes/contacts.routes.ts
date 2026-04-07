@@ -64,7 +64,7 @@ router.get(
   authMiddleware(),
   asyncHandler(async (req: AuthRequest, res: Response) => {
     const contact = await prisma.contact.findUnique({
-      where: { id: req.params.id },
+      where: { id: req.params.id as string },
       include: {
         conversations: {
           orderBy: { updatedAt: 'desc' },
@@ -102,7 +102,7 @@ router.put(
 
     const data = updateSchema.parse(req.body);
     const contact = await prisma.contact.update({
-      where: { id: req.params.id },
+      where: { id: req.params.id as string },
       data,
     });
 
@@ -117,7 +117,7 @@ router.delete(
   '/:id',
   authMiddleware(['ADMIN']),
   asyncHandler(async (req: AuthRequest, res: Response) => {
-    await prisma.contact.delete({ where: { id: req.params.id } });
+    await prisma.contact.delete({ where: { id: req.params.id as string } });
     res.json({ message: 'Kişi silindi' });
   })
 );

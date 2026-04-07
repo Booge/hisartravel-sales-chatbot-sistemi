@@ -99,7 +99,7 @@ router.put(
     if (data.stage === 'LOST') extra.lostAt = new Date();
 
     const lead = await prisma.lead.update({
-      where: { id: req.params.id },
+      where: { id: req.params.id as string },
       data: { ...data, ...extra },
       include: { contact: true, assignee: { select: { id: true, name: true } } },
     });
