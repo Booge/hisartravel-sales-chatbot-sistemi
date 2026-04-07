@@ -47,7 +47,8 @@ async function main() {
   app.use(express.urlencoded({ extended: true }));
   app.use(cookieParser());
 
-  // Rate limiting
+  // Rate limiting (trust proxy required when behind Traefik/Cloudflare)
+  app.set('trust proxy', 1);
   const limiter = rateLimit({
     windowMs: 1 * 60 * 1000, // 1 minute
     max: 100,
